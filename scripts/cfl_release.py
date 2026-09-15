@@ -59,7 +59,20 @@ def codex_version() -> str:
     raise RuntimeError("workspace version is missing from codex-rs/Cargo.toml")
 
 
+def rust_host_triple() -> str:
+    output = subprocess.check_output(["rustc", "-vV"], text=True)
+    for line in output.splitlines():
+        if line.startswith("host: "):
+            return line.removeprefix("host: ")
+    raise RuntimeError("rustc -vV did not report a host triple")
+
+
 def build_codex(target: str, target_dir: Path, jobs: int) -> Path:
+    host = rust_host_triple()
+    if target != host:
+        raise RuntimeError(
+            f"target {target} does not match native rustc host {host}; cross-compilation is unsupported"
+        )
     environment = os.environ | {
         "CARGO_BUILD_JOBS": str(jobs),
         "CARGO_TARGET_DIR": str(target_dir),
@@ -72,8 +85,6 @@ def build_codex(target: str, target_dir: Path, jobs: int) -> Path:
             "--release",
             "--jobs",
             str(jobs),
-            "--target",
-            target,
             "--package",
             "codex-cli",
             "--bin",
@@ -82,7 +93,7 @@ def build_codex(target: str, target_dir: Path, jobs: int) -> Path:
         cwd=REPO_ROOT / "codex-rs",
         env=environment,
     )
-    return target_dir / target / "release" / "codex"
+    return target_dir / "release" / "codex"
 
 
 def archive_name(release_tag: str, target: str) -> str:
@@ -162,8 +173,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--jobs",
         type=positive_jobs,
-        default=positive_jobs(os.environ.get("CARGO_BUILD_JOBS", "2")),
-        help="Cargo jobs (default: %(default)s; do not overlap Rust-heavy builds)",
+        default=positive_jobs(os.environ.get("CARGO_BUILD_JOBS", "4")),
+        help="Cargo jobs (default: %(default)s; run only one native build at a time)",
     )
     parser.add_argument(
         "--finalize-checksums",
