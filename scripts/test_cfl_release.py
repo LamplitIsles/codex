@@ -28,7 +28,7 @@ class CflReleaseTest(unittest.TestCase):
             fake_executable(app_server, b"app-server fixture")
             fake_executable(helper, b"helper fixture")
             output = root / "output"
-            for target in ("x86_64-unknown-linux-gnu", "aarch64-apple-darwin"):
+            for target in ("x86_64-unknown-linux-musl",):
                 subprocess.check_call(
                     [
                         sys.executable,
@@ -46,7 +46,7 @@ class CflReleaseTest(unittest.TestCase):
                     ]
                 )
             archives = sorted(output.glob("*.tar.gz"))
-            self.assertEqual(len(archives), 2)
+            self.assertEqual(len(archives), 1)
             subprocess.check_call(
                 [
                     sys.executable,
@@ -70,7 +70,7 @@ class CflReleaseTest(unittest.TestCase):
                     name for name in names if name.endswith("/provenance.json")
                 )
                 provenance = json.load(archive.extractfile(provenance_name))
-            self.assertEqual(provenance["target"], "aarch64-apple-darwin")
+            self.assertEqual(provenance["target"], "x86_64-unknown-linux-musl")
             self.assertFalse(str(root) in json.dumps(provenance))
 
     def test_checksum_finalization_rejects_stale_archives(self) -> None:
@@ -78,7 +78,7 @@ class CflReleaseTest(unittest.TestCase):
             output = Path(temporary)
             (
                 output
-                / "cfl-codex-app-server-stale-x86_64-unknown-linux-gnu.tar.gz"
+                / "cfl-codex-app-server-stale-aarch64-apple-darwin.tar.gz"
             ).touch()
             result = subprocess.run(
                 [
@@ -109,7 +109,7 @@ class CflReleaseTest(unittest.TestCase):
                 sys.executable,
                 str(SCRIPT),
                 "--target",
-                "x86_64-unknown-linux-gnu",
+                "x86_64-unknown-linux-musl",
                 "--jobs",
                 "0",
             ],
@@ -119,7 +119,7 @@ class CflReleaseTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("positive integer", result.stderr)
 
-    def test_rejects_non_native_source_build_target(self) -> None:
+    def test_rejects_unsupported_source_build_target(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             helper = Path(temporary) / "codex-code-mode-host"
             fake_executable(helper, b"helper fixture")
@@ -140,7 +140,7 @@ class CflReleaseTest(unittest.TestCase):
                 capture_output=True,
             )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("cross-compilation is unsupported", result.stderr)
+        self.assertIn("invalid choice", result.stderr)
 
 
 if __name__ == "__main__":

@@ -17,9 +17,9 @@ from pathlib import Path
 
 
 SUPPORTED_TARGETS = {
-    "x86_64-unknown-linux-gnu",
-    "aarch64-apple-darwin",
+    "x86_64-unknown-linux-musl",
 }
+LINUX_MUSL_TARGET = "x86_64-unknown-linux-musl"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RELEASE_PROFILE_ENV = {
     "CARGO_INCREMENTAL": "0",
@@ -33,23 +33,26 @@ RELEASE_PROFILE_ENV = {
 LINUX_SCOPE_PROPERTIES = {
     "MemoryMax": "6G",
     "MemorySwapMax": "512M",
-    "CPUQuota": "400%",
+    "CPUQuota": "800%",
     "TasksMax": "256",
 }
 LINUX_SCOPE_EXPECTED = {
     "MemoryMax": "6442450944",
     "MemorySwapMax": "536870912",
-    "CPUQuotaPerSecUSec": "4s",
+    "CPUQuotaPerSecUSec": "8s",
     "TasksMax": "256",
 }
 LINUX_HOST_TOOLCHAIN = Path("/run/current-system/sw/bin")
-LINUX_NATIVE_ENV = {
-    "PKG_CONFIG": "/nix/store/j5fz28pic24azmxkv183hk6fchfs7ag8-pkg-config-0.29.2/bin/pkg-config",
-    "PKG_CONFIG_PATH": "/nix/store/qi22r2qc7fnvnw807pdc5p9a7yrxi6rr-openssl-3.6.2-dev/lib/pkgconfig",
-    "OPENSSL_DIR": "/nix/store/wjlr3l4gdxsnji1sky91kh7m4q7mmxy8-openssl-3.6.2",
-    "OPENSSL_INCLUDE_DIR": "/nix/store/qi22r2qc7fnvnw807pdc5p9a7yrxi6rr-openssl-3.6.2-dev/include",
-    "OPENSSL_LIB_DIR": "/nix/store/wjlr3l4gdxsnji1sky91kh7m4q7mmxy8-openssl-3.6.2/lib",
-    "PATHELF": "/nix/store/3vs2fr2mazafcdwyza15bfhpmccx1k7z-patchelf-0.15.2/bin/patchelf",
+LINUX_MUSL_ENV = {
+    "CC": "/run/current-system/sw/bin/x86_64-unknown-linux-musl-gcc",
+    "CXX": "/run/current-system/sw/bin/x86_64-unknown-linux-musl-g++",
+    "CFLAGS": "-pthread",
+    "CXXFLAGS": "-pthread",
+    "PKG_CONFIG": "/run/current-system/sw/bin/pkg-config",
+    "PKG_CONFIG_ALLOW_CROSS": "1",
+    "PKG_CONFIG_LIBDIR": "/nonexistent",
+    "PKG_CONFIG_PATH": "/nonexistent",
+    "AWS_LC_SYS_NO_JITTER_ENTROPY": "1",
 }
 
 
@@ -110,7 +113,7 @@ def rust_host_triple() -> str:
     raise RuntimeError("rustc -vV did not report a host triple")
 
 
-def release_environment(target_dir: Path, jobs: int) -> dict[str, str]:
+def release_environment(target: str, target_dir: Path, jobs: int) -> dict[str, str]:
     environment = (
         os.environ
         | RELEASE_PROFILE_ENV
@@ -120,15 +123,28 @@ def release_environment(target_dir: Path, jobs: int) -> dict[str, str]:
         }
     )
     if sys.platform == "linux":
+        for name in tuple(environment):
+            if name.startswith(("OPENSSL_", "PKG_CONFIG_")) or name in {
+                "CC",
+                "CXX",
+                "CFLAGS",
+                "CXXFLAGS",
+            }:
+                environment.pop(name)
         environment |= {
             "RUSTC": host_executable("rustc"),
-            "CC": host_executable("cc"),
-            "CXX": host_executable("c++"),
         }
-        environment |= LINUX_NATIVE_ENV
-        environment["PATH"] = (
-            f"{Path(LINUX_NATIVE_ENV['PATHELF']).parent}:{environment['PATH']}"
-        )
+        if target == LINUX_MUSL_TARGET:
+            environment |= LINUX_MUSL_ENV
+            environment["CMAKE_BUILD_PARALLEL_LEVEL"] = str(jobs)
+            environment["MAKEFLAGS"] = f"-j{jobs}"
+            target_variable = target.upper().replace("-", "_")
+            environment[f"CC_{target_variable}"] = environment["CC"]
+            environment[f"CXX_{target_variable}"] = environment["CXX"]
+            environment[f"CARGO_TARGET_{target_variable}_LINKER"] = environment["CC"]
+            environment[f"PKG_CONFIG_LIBDIR_{target_variable}"] = "/nonexistent"
+            environment[f"PKG_CONFIG_PATH_{target_variable}"] = "/nonexistent"
+            environment[f"AWS_LC_SYS_NO_JITTER_ENTROPY_{target_variable}"] = "1"
     return environment
 
 
@@ -227,14 +243,23 @@ def linux_scoped(
             "CARGO_LOG",
             "PKG_CONFIG",
             "PKG_CONFIG_PATH",
-            "OPENSSL_DIR",
-            "OPENSSL_INCLUDE_DIR",
-            "OPENSSL_LIB_DIR",
-            "PATHELF",
+            "PKG_CONFIG_ALLOW_CROSS",
+            "PKG_CONFIG_LIBDIR",
             "LIBCLANG_PATH",
             "LD_LIBRARY_PATH",
             "CC",
             "CXX",
+            "CFLAGS",
+            "CXXFLAGS",
+            "CMAKE_BUILD_PARALLEL_LEVEL",
+            "MAKEFLAGS",
+            "AWS_LC_SYS_NO_JITTER_ENTROPY",
+            "CC_X86_64_UNKNOWN_LINUX_MUSL",
+            "CXX_X86_64_UNKNOWN_LINUX_MUSL",
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER",
+            "PKG_CONFIG_LIBDIR_X86_64_UNKNOWN_LINUX_MUSL",
+            "PKG_CONFIG_PATH_X86_64_UNKNOWN_LINUX_MUSL",
+            "AWS_LC_SYS_NO_JITTER_ENTROPY_X86_64_UNKNOWN_LINUX_MUSL",
         )
         if name in environment
     ]
@@ -254,8 +279,8 @@ def linux_scoped(
     return [*scoped_command, *command]
 
 
-def linux_build_command(workspace: Path, jobs: int) -> list[str]:
-    """Validate the release environment in Cargo's unit before starting Cargo."""
+def linux_musl_preflight_command(workspace: Path) -> list[str]:
+    """Validate the isolated musl compiler and linker in the release scope."""
     return [
         host_executable("bash"),
         "-c",
@@ -269,36 +294,68 @@ def linux_build_command(workspace: Path, jobs: int) -> list[str]:
             "$RUSTC" -vV | grep -Fqx 'commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452'
             "$RUSTC" -vV | grep -Fqx 'LLVM version: 22.1.6'
             "$cargo_bin" -V | grep -Fqx 'cargo 1.97.1 (c980f4866 2026-06-30)'
-            "$PKG_CONFIG" --modversion openssl | grep -Fqx '3.6.2'
-            "$PKG_CONFIG" --cflags --libs openssl >/dev/null
-            test -f "$OPENSSL_INCLUDE_DIR/openssl/ssl.h"
-            test -f "$OPENSSL_LIB_DIR/libssl.so"
-            printf '#include <stddef.h>\\n#include <limits.h>\\n#include <stdio.h>\\n' |
-                "$CC" -E -x c - >/dev/null
-            "$PATHELF" --version >/dev/null
-            exec "$cargo_bin" build --locked --release --jobs "$3" \
-                --package codex-app-server --bin codex-app-server
+            set -- "$("$RUSTC" --print target-libdir --target x86_64-unknown-linux-musl)"/libstd-*.rlib
+            test -f "$1"
+            "$CC" --version >/dev/null
+            "$CXX" --version >/dev/null
+            "$PKG_CONFIG" --version >/dev/null
+            probe="$(mktemp)"
+            trap 'rm -f "$probe"' EXIT
+            printf '#include <stddef.h>\\n#include <limits.h>\\n#include <stdio.h>\\nint main(void) { return 0; }\\n' |
+                "$CC" -static -x c - -o "$probe"
+            ! readelf -lW "$probe" | grep -Fq 'Requesting program interpreter'
+            ! readelf -dW "$probe" | grep -Fq '(NEEDED)'
         """,
-        "cfl-codex-app-server-build",
+        "cfl-codex-app-server-musl-preflight",
         host_executable("cargo"),
         str(workspace),
-        str(jobs),
     ]
 
 
-def build_app_server(target: str, target_dir: Path, jobs: int) -> Path:
-    host = rust_host_triple()
-    if target != host:
-        raise RuntimeError(
-            f"target {target} does not match native rustc host {host}; cross-compilation is unsupported"
-        )
-    environment = release_environment(target_dir, jobs)
+def preflight_linux_musl(target_dir: Path, jobs: int) -> None:
+    environment = release_environment(LINUX_MUSL_TARGET, target_dir, jobs)
     workspace = REPO_ROOT / "codex-rs"
+    verify_linux_scope()
+    command = linux_scoped(
+        linux_musl_preflight_command(workspace), environment, workspace
+    )
+    subprocess.check_call(command, cwd=workspace, env=environment)
+
+
+def build_app_server(target: str, target_dir: Path, jobs: int) -> Path:
+    if target != LINUX_MUSL_TARGET:
+        host = rust_host_triple()
+        if target != host:
+            raise RuntimeError(
+                f"target {target} does not match native rustc host {host}; cross-compilation is unsupported"
+            )
+        environment = release_environment(target, target_dir, jobs)
+        workspace = REPO_ROOT / "codex-rs"
+        command = [
+            host_executable("cargo"),
+            "build",
+            "--locked",
+            "--release",
+            "--jobs",
+            str(jobs),
+            "--package",
+            "codex-app-server",
+            "--bin",
+            "codex-app-server",
+        ]
+        subprocess.check_call(command, cwd=workspace, env=environment)
+        return target_dir / "release" / "codex-app-server"
+
+    environment = release_environment(target, target_dir, jobs)
+    workspace = REPO_ROOT / "codex-rs"
+    verify_linux_scope()
     command = [
         host_executable("cargo"),
         "build",
         "--locked",
         "--release",
+        "--target",
+        target,
         "--jobs",
         str(jobs),
         "--package",
@@ -306,30 +363,19 @@ def build_app_server(target: str, target_dir: Path, jobs: int) -> Path:
         "--bin",
         "codex-app-server",
     ]
-    if sys.platform == "linux":
-        verify_linux_scope()
-        command = linux_scoped(linux_build_command(workspace, jobs), environment, workspace)
+    command = linux_scoped(command, environment, workspace)
     subprocess.check_call(command, cwd=workspace, env=environment)
-    return target_dir / "release" / "codex-app-server"
+    return target_dir / target / "release" / "codex-app-server"
 
 
 def archive_name(release_tag: str, target: str) -> str:
     return f"cfl-codex-app-server-{release_tag.replace('/', '-')}-{target}.tar.gz"
 
 
-def archive_binary(app_server_bin: Path, target: str, directory: Path) -> Path:
-    """Copy the Cargo artifact before applying Linux runtime linkage metadata."""
+def archive_binary(app_server_bin: Path, directory: Path) -> Path:
+    """Copy the verified Cargo artifact without modifying the cache entry."""
     artifact = directory / "codex-app-server"
     shutil.copy2(app_server_bin, artifact)
-    if target == "x86_64-unknown-linux-gnu":
-        patchelf = LINUX_NATIVE_ENV["PATHELF"]
-        needed = subprocess.run(
-            [patchelf, "--print-needed", artifact], capture_output=True, text=True
-        )
-        if needed.returncode == 0 and "libssl.so.3" in needed.stdout.splitlines():
-            subprocess.check_call(
-                [patchelf, "--add-rpath", LINUX_NATIVE_ENV["OPENSSL_LIB_DIR"], artifact]
-            )
     return artifact
 
 
@@ -348,7 +394,7 @@ def write_archive(
     if archive_path.exists():
         raise RuntimeError(f"release archive already exists: {archive_path}")
     with tempfile.TemporaryDirectory() as temporary:
-        artifact = archive_binary(app_server_bin, target, Path(temporary))
+        artifact = archive_binary(app_server_bin, Path(temporary))
         provenance = {
             "schemaVersion": 1,
             "forkRepository": "https://github.com/lamplitisles/codex",
@@ -381,7 +427,7 @@ def write_manifest(output_dir: Path) -> Path:
     archives = sorted(output_dir.glob("cfl-codex-app-server-*.tar.gz"))
     if len(archives) != len(SUPPORTED_TARGETS):
         raise RuntimeError(
-            "checksum finalization requires exactly one archive for each supported target"
+            "checksum finalization requires exactly one archive for the supported target"
         )
     targets = {
         target
@@ -390,7 +436,7 @@ def write_manifest(output_dir: Path) -> Path:
     }
     if targets != SUPPORTED_TARGETS:
         raise RuntimeError(
-            "checksum finalization requires exactly one archive for each supported target"
+            "checksum finalization requires exactly one archive for the supported target"
         )
     manifest = output_dir / "SHA256SUMS"
     manifest.write_text("".join(f"{sha256(path)}  {path.name}\n" for path in archives))
@@ -401,10 +447,15 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", choices=sorted(SUPPORTED_TARGETS))
     parser.add_argument("--release-tag")
-    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--code-mode-host-bin", type=Path)
     parser.add_argument("--app-server-bin", type=Path)
     parser.add_argument("--cargo-target-dir", type=Path)
+    parser.add_argument(
+        "--preflight-only",
+        action="store_true",
+        help="verify Linux musl prerequisites in the enforced scope without running Cargo",
+    )
     parser.add_argument(
         "--jobs",
         type=positive_jobs,
@@ -421,7 +472,16 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    if args.preflight_only:
+        if args.target != LINUX_MUSL_TARGET or args.release_tag is not None:
+            raise RuntimeError("--preflight-only requires only --target x86_64-unknown-linux-musl")
+        target_dir = args.cargo_target_dir or default_target_dir()
+        preflight_linux_musl(target_dir, args.jobs)
+        print("musl preflight: ready")
+        return 0
     if args.finalize_checksums:
+        if args.output_dir is None:
+            raise RuntimeError("--finalize-checksums requires --output-dir")
         if any(
             value is not None
             for value in (args.target, args.app_server_bin, args.code_mode_host_bin)
@@ -434,6 +494,7 @@ def main() -> int:
         args.target is None
         or args.release_tag is None
         or args.code_mode_host_bin is None
+        or args.output_dir is None
     ):
         raise RuntimeError(
             "--target, --release-tag, and --code-mode-host-bin are required to build an archive"

@@ -8,10 +8,10 @@ point is `scripts/cfl_release.py`, not a general Rust build replacement.
   Keep existing artifacts until cache reuse has been inspected.
 - Before a Linux release build, use the explicit host Rust/Cargo executables
   rather than a Nix development shell, whose Rust selection need not match the
-  reusable native cache. Pass the retained Linux `pkg-config`, OpenSSL, and
-  `patchelf` prerequisites explicitly.
-- Build `codex-app-server`/`codex-app-server` natively with `--locked --release`, never an
-  explicit Cargo `--target`, using four jobs by default. Preserve the release
+  reusable native cache. Use the fixed target musl compiler/linker and do not
+  pass GNU OpenSSL paths into the build.
+- Build `codex-app-server`/`codex-app-server` with `--locked --release
+  --target x86_64-unknown-linux-musl`, using four jobs by default. Preserve the release
   profile: `CARGO_INCREMENTAL=0`,
   `CARGO_PROFILE_RELEASE_INCREMENTAL=false`,
   `CARGO_PROFILE_RELEASE_LTO=false`, `CARGO_PROFILE_RELEASE_DEBUG=0`,
@@ -19,12 +19,12 @@ point is `scripts/cfl_release.py`, not a general Rust build replacement.
   `CARGO_PROFILE_RELEASE_OPT_LEVEL=1`, and
   `CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16`.
 - On Linux, a release build must first prove its systemd user scope enforces
-  `MemoryMax=6G`, `MemorySwapMax=512M`, `CPUQuota=400%`, and `TasksMax=256`.
+  `MemoryMax=6G`, `MemorySwapMax=512M`, `CPUQuota=800%`, and `TasksMax=256`.
   Run one heavy release build at a time. Stop and report widespread cache
   misses rather than starting a cold build.
 - For this packaging path, use the hermetic release-assembly test and artifact
-  checks; do not start the Rust test graph. Build Linux first; macOS is a
-  separate later native build.
+  checks; do not start the Rust test graph. No other platform build is
+  currently authorized.
 
 # Rust/codex-rs
 
