@@ -98,6 +98,22 @@ class CflReleaseTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("invalid choice", result.stderr)
 
+    def test_rejects_non_positive_job_override(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--target",
+                "x86_64-unknown-linux-gnu",
+                "--jobs",
+                "0",
+            ],
+            text=True,
+            capture_output=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("positive integer", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

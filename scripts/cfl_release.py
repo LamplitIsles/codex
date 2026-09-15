@@ -24,6 +24,13 @@ def default_target_dir() -> Path:
     return cache_home / "lamplitisles" / "codex-for-love" / "cargo-target"
 
 
+def positive_jobs(value: str) -> int:
+    jobs = int(value)
+    if jobs < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return jobs
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as file:
@@ -52,14 +59,19 @@ def codex_version() -> str:
     raise RuntimeError("workspace version is missing from codex-rs/Cargo.toml")
 
 
-def build_codex(target: str, target_dir: Path) -> Path:
-    environment = os.environ | {"CARGO_TARGET_DIR": str(target_dir)}
+def build_codex(target: str, target_dir: Path, jobs: int) -> Path:
+    environment = os.environ | {
+        "CARGO_BUILD_JOBS": str(jobs),
+        "CARGO_TARGET_DIR": str(target_dir),
+    }
     subprocess.check_call(
         [
             "cargo",
             "build",
             "--locked",
             "--release",
+            "--jobs",
+            str(jobs),
             "--target",
             target,
             "--package",
@@ -148,6 +160,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--codex-bin", type=Path)
     parser.add_argument("--cargo-target-dir", type=Path)
     parser.add_argument(
+        "--jobs",
+        type=positive_jobs,
+        default=positive_jobs(os.environ.get("CARGO_BUILD_JOBS", "2")),
+        help="Cargo jobs (default: %(default)s; do not overlap Rust-heavy builds)",
+    )
+    parser.add_argument(
         "--finalize-checksums",
         action="store_true",
         help="write SHA256SUMS only after verifying a clean two-target output directory",
@@ -179,7 +197,7 @@ def main() -> int:
         codex = executable(args.codex_bin, "Codex")
     else:
         target_dir = args.cargo_target_dir or default_target_dir()
-        codex = executable(build_codex(args.target, target_dir), "built Codex")
+        codex = executable(build_codex(args.target, target_dir, args.jobs), "built Codex")
     archive = write_archive(
         args.output_dir.resolve(), args.release_tag, args.target, codex, helper
     )
