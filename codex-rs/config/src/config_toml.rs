@@ -255,6 +255,9 @@ pub struct ConfigToml {
     /// Compact prompt used for history compaction.
     pub compact_prompt: Option<String>,
 
+    /// Force supported compaction routes through the local Responses summarizer.
+    pub experimental_local_compaction: Option<bool>,
+
     /// When set, restricts ChatGPT login to one or more workspace identifiers.
     #[serde(default)]
     pub forced_chatgpt_workspace_id: Option<ForcedChatgptWorkspaceIds>,

@@ -190,7 +190,7 @@ const TEST_AGENT_IDENTITY_PRIVATE_KEY: &str =
     "MC4CAQAwBQYDK2VwBCIEIJ7kFBaOujmoz1gvBNEC+BeM2IX87FFB0xmISOZ/XO0c";
 
 fn summary_with_prefix(summary: &str) -> String {
-    format!("{SUMMARY_PREFIX}\n{summary}")
+    format!("{SUMMARY_PREFIX}\n\n{summary}")
 }
 
 fn context_snapshot_options() -> ContextSnapshotOptions {

@@ -152,7 +152,7 @@ fn auto_summary(summary: &str) -> String {
 }
 
 fn summary_with_prefix(summary: &str) -> String {
-    format!("{SUMMARY_PREFIX}\n{summary}")
+    format!("{SUMMARY_PREFIX}\n\n{summary}")
 }
 
 fn set_test_compact_prompt(config: &mut Config) {
@@ -767,6 +767,77 @@ async fn summarize_context_three_requests_and_instructions(
         saw_compacted_summary,
         "expected a Compacted entry containing the summarizer output"
     );
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn explicit_local_compaction_override_routes_builtin_openai_manual() -> Result<()> {
+    skip_if_no_network!(Ok(()));
+
+    let server = start_mock_server().await;
+    let request_log = mount_sse_sequence(
+        &server,
+        vec![
+            sse(vec![
+                ev_assistant_message("initial", FIRST_REPLY),
+                ev_completed("initial"),
+            ]),
+            sse(vec![
+                ev_assistant_message("compact", SUMMARY_TEXT),
+                ev_completed("compact"),
+            ]),
+            sse(vec![ev_completed("follow-up")]),
+        ],
+    )
+    .await;
+
+    let model_provider = openai_model_provider(&server);
+    let mut builder = test_codex().with_config(move |config| {
+        config.model_provider = model_provider;
+        config.experimental_local_compaction = true;
+        let _ = config.features.enable(Feature::RemoteCompactionV2);
+        set_test_compact_prompt(config);
+    });
+    let codex = builder.build(&server).await?.codex;
+
+    codex
+        .start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
+            text: "before explicit local compact".into(),
+            text_elements: Vec::new(),
+        }]))
+        .await?;
+    wait_for_event(&codex, |ev| matches!(ev, EventMsg::TurnComplete(_))).await;
+
+    codex.submit(Op::Compact).await?;
+    wait_for_event(&codex, |ev| matches!(ev, EventMsg::TurnComplete(_))).await;
+
+    codex
+        .start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
+            text: THIRD_USER_MSG.into(),
+            text_elements: Vec::new(),
+        }]))
+        .await?;
+    wait_for_event(&codex, |ev| matches!(ev, EventMsg::TurnComplete(_))).await;
+
+    let requests = request_log.requests();
+    assert_eq!(requests.len(), 3);
+    let compact_body = requests[1].body_json();
+    let compact_input = compact_body["input"].as_array().expect("compact input");
+    assert!(compact_input.iter().any(|item| {
+        item["type"] == "message"
+            && item["role"] == "user"
+            && item["content"][0]["text"] == SUMMARIZATION_PROMPT
+    }));
+    assert!(
+        !compact_input
+            .iter()
+            .any(|item| item["type"] == "compaction_trigger")
+    );
+    assert!(body_contains_text(
+        &requests[2].body_json().to_string(),
+        &summary_with_prefix(SUMMARY_TEXT),
+    ));
+
     Ok(())
 }
 
@@ -1721,10 +1792,12 @@ async fn auto_compact_runs_after_token_limit_hit() {
 
     let request_log = mount_sse_sequence(&server, vec![sse1, sse2, sse3, sse4]).await;
 
-    let model_provider = non_openai_model_provider(&server);
+    let model_provider = openai_model_provider(&server);
 
     let mut builder = test_codex().with_config(move |config| {
         config.model_provider = model_provider;
+        config.experimental_local_compaction = true;
+        let _ = config.features.enable(Feature::RemoteCompactionV2);
         set_test_compact_prompt(config);
         config.model_auto_compact_token_limit = Some(200_000);
     });

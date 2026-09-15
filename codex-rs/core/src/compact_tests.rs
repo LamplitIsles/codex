@@ -546,7 +546,7 @@ async fn process_compacted_history_inserts_context_before_last_real_user_message
             id: None,
             role: "user".to_string(),
             content: vec![ContentItem::InputText {
-                text: format!("{SUMMARY_PREFIX}\nsummary text"),
+                text: format!("{SUMMARY_PREFIX}\n\nsummary text"),
             }],
             phase: None,
             internal_chat_message_metadata_passthrough: None,
@@ -581,7 +581,7 @@ async fn process_compacted_history_inserts_context_before_last_real_user_message
             id: None,
             role: "user".to_string(),
             content: vec![ContentItem::InputText {
-                text: format!("{SUMMARY_PREFIX}\nsummary text"),
+                text: format!("{SUMMARY_PREFIX}\n\nsummary text"),
             }],
             phase: None,
             internal_chat_message_metadata_passthrough: None,
@@ -680,7 +680,7 @@ fn insert_initial_context_before_last_real_user_or_summary_keeps_summary_last() 
             id: None,
             role: "user".to_string(),
             content: vec![ContentItem::InputText {
-                text: format!("{SUMMARY_PREFIX}\nsummary text"),
+                text: format!("{SUMMARY_PREFIX}\n\nsummary text"),
             }],
             phase: None,
             internal_chat_message_metadata_passthrough: None,
@@ -733,7 +733,7 @@ fn insert_initial_context_before_last_real_user_or_summary_keeps_summary_last() 
             id: None,
             role: "user".to_string(),
             content: vec![ContentItem::InputText {
-                text: format!("{SUMMARY_PREFIX}\nsummary text"),
+                text: format!("{SUMMARY_PREFIX}\n\nsummary text"),
             }],
             phase: None,
             internal_chat_message_metadata_passthrough: None,
