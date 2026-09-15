@@ -720,6 +720,9 @@ pub struct Config {
     /// Compact prompt override.
     pub compact_prompt: Option<String>,
 
+    /// Whether manual and automatic compaction should use the local summarizer.
+    pub experimental_local_compaction: bool,
+
     /// Optional external notifier command. When set, Codex will spawn this
     /// program after each completed *turn* (i.e. when the agent finishes
     /// processing a user submission). The value must be the full command
@@ -4219,6 +4222,7 @@ impl Config {
             personality,
             developer_instructions,
             compact_prompt,
+            experimental_local_compaction: cfg.experimental_local_compaction.unwrap_or(false),
             include_permissions_instructions,
             include_apps_instructions,
             include_collaboration_mode_instructions,

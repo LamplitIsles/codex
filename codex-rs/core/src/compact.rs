@@ -359,7 +359,7 @@ async fn run_compact_task_inner_impl(
     } else {
         get_last_assistant_message_from_turn(history_snapshot.raw_items()).unwrap_or_default()
     };
-    let summary_text = format!("{SUMMARY_PREFIX}\n{summary_suffix}");
+    let summary_text = format!("{SUMMARY_PREFIX}\n\n{summary_suffix}");
     let identity = if sess.guardian_context_mode == GuardianContextMode::ThreadOwned {
         CompactedMessageIdentity::Preserve
     } else {
@@ -600,7 +600,7 @@ fn compacted_user_message(
 }
 
 pub(crate) fn is_summary_message(message: &str) -> bool {
-    message.starts_with(format!("{SUMMARY_PREFIX}\n").as_str())
+    message.starts_with(format!("{SUMMARY_PREFIX}\n\n").as_str())
 }
 
 /// Inserts canonical initial context into compacted replacement history at the

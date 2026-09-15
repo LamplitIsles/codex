@@ -38,6 +38,31 @@ impl SessionTask for CompactTask {
             return Ok(None);
         }
 
+        if ctx.config.experimental_local_compaction {
+            emit_compact_metric(
+                &session.services.session_telemetry,
+                "local",
+                /*manual*/ true,
+            );
+            let input = vec![UserInput::Text {
+                text: ctx
+                    .config
+                    .compact_prompt
+                    .as_deref()
+                    .unwrap_or(crate::compact::SUMMARIZATION_PROMPT)
+                    .to_string(),
+                // Compaction prompt is synthesized; no UI element ranges to preserve.
+                text_elements: Vec::new(),
+            }];
+            let result = crate::compact::run_compact_task(session.clone(), ctx, input).await;
+            if let Err(err) = result
+                && matches!(err.details(), CodexErrorDetails::TurnAborted)
+            {
+                return Err(err);
+            }
+            return Ok(None);
+        }
+
         let result = match ctx.provider.capabilities().remote_compaction {
             RemoteCompactionSupport::V2 => {
                 emit_compact_metric(

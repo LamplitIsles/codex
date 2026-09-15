@@ -224,6 +224,7 @@ fn new_config(model: Option<String>, arg0_paths: Arg0DispatchPaths) -> anyhow::R
         orchestrator_mcp_enabled: false,
         include_environment_context: false,
         compact_prompt: None,
+        experimental_local_compaction: false,
         notify: None,
         tui_notifications: TuiNotificationSettings::default(),
         animations: true,

@@ -10219,7 +10219,7 @@ async fn record_context_updates_and_set_reference_context_item_reinjects_full_co
         id: None,
         role: "user".to_string(),
         content: vec![ContentItem::InputText {
-            text: format!("{}\nsummary", crate::compact::SUMMARY_PREFIX),
+            text: format!("{}\n\nsummary", crate::compact::SUMMARY_PREFIX),
         }],
         phase: None,
         internal_chat_message_metadata_passthrough: None,

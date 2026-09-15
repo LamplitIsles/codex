@@ -1466,6 +1466,23 @@ async fn run_auto_compact(
         return Ok(());
     }
 
+    if turn_context.config.experimental_local_compaction {
+        emit_compact_metric(
+            &sess.services.session_telemetry,
+            "local",
+            /*manual*/ false,
+        );
+        run_inline_auto_compact_task(
+            Arc::clone(sess),
+            Arc::clone(turn_context),
+            initial_context_injection,
+            reason,
+            phase,
+        )
+        .await?;
+        return Ok(());
+    }
+
     match turn_context.provider.capabilities().remote_compaction {
         RemoteCompactionSupport::V2 => {
             emit_compact_metric(

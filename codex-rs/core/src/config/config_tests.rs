@@ -8296,6 +8296,23 @@ async fn cli_override_sets_compact_prompt() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+async fn config_loads_local_compaction_override() -> std::io::Result<()> {
+    let codex_home = TempDir::new()?;
+    let config = Config::load_from_base_config_with_overrides(
+        ConfigToml {
+            experimental_local_compaction: Some(true),
+            ..Default::default()
+        },
+        ConfigOverrides::default(),
+        codex_home.abs(),
+    )
+    .await?;
+
+    assert!(config.experimental_local_compaction);
+    Ok(())
+}
+
+#[tokio::test]
 async fn loads_compact_prompt_from_file() -> std::io::Result<()> {
     let codex_home = TempDir::new()?;
     let workspace = codex_home.path().join("workspace");
