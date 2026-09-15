@@ -197,7 +197,9 @@ def main() -> int:
         codex = executable(args.codex_bin, "Codex")
     else:
         target_dir = args.cargo_target_dir or default_target_dir()
-        codex = executable(build_codex(args.target, target_dir, args.jobs), "built Codex")
+        codex = executable(
+            build_codex(args.target, target_dir, args.jobs), "built Codex"
+        )
     archive = write_archive(
         args.output_dir.resolve(), args.release_tag, args.target, codex, helper
     )
