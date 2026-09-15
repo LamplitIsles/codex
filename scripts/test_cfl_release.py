@@ -23,9 +23,9 @@ class CflReleaseTest(unittest.TestCase):
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            codex = root / "codex"
+            app_server = root / "codex-app-server"
             helper = root / "codex-code-mode-host"
-            fake_executable(codex, b"codex fixture")
+            fake_executable(app_server, b"app-server fixture")
             fake_executable(helper, b"helper fixture")
             output = root / "output"
             for target in ("x86_64-unknown-linux-gnu", "aarch64-apple-darwin"):
@@ -39,8 +39,8 @@ class CflReleaseTest(unittest.TestCase):
                         "cfl/v0.154.0-rc.1",
                         "--output-dir",
                         str(output),
-                        "--codex-bin",
-                        str(codex),
+                        "--app-server-bin",
+                        str(app_server),
                         "--code-mode-host-bin",
                         str(helper),
                     ]
@@ -60,7 +60,9 @@ class CflReleaseTest(unittest.TestCase):
             self.assertTrue(all(archive.name in manifest for archive in archives))
             with tarfile.open(archives[0]) as archive:
                 names = archive.getnames()
-                self.assertTrue(any(name.endswith("/bin/codex") for name in names))
+                self.assertTrue(
+                    any(name.endswith("/bin/codex-app-server") for name in names)
+                )
                 self.assertTrue(
                     any(name.endswith("/bin/codex-code-mode-host") for name in names)
                 )
@@ -74,7 +76,10 @@ class CflReleaseTest(unittest.TestCase):
     def test_checksum_finalization_rejects_stale_archives(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
-            (output / "cfl-codex-stale-x86_64-unknown-linux-gnu.tar.gz").touch()
+            (
+                output
+                / "cfl-codex-app-server-stale-x86_64-unknown-linux-gnu.tar.gz"
+            ).touch()
             result = subprocess.run(
                 [
                     sys.executable,
