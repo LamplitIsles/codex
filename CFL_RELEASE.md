@@ -13,9 +13,11 @@ installed by the official Codex package. The command builds the forked `codex`
 binary from source; `--code-mode-host-bin` names that official helper.
 
 On Linux, keep Cargo artifacts outside the checkout so CFL's existing cache is
-reused. Release compilation defaults to two Cargo jobs. Do not run it while a
-Rust test, formatter, or another release build is active; use `--jobs N` only
-for an explicit, capacity-reviewed override.
+reused. Release compilation defaults to four Cargo jobs. Do not run it while
+another release build is active; use `--jobs N` only for an explicit override.
+The command compares `--target` with `rustc -vV`'s host triple and rejects a
+mismatch, then invokes native Cargo without `--target` so it reuses the shared
+`release/` cache seam.
 
 ```shell
 python3 scripts/cfl_release.py \
@@ -36,8 +38,8 @@ python3 scripts/cfl_release.py \
   --code-mode-host-bin /path/to/official/codex-code-mode-host
 ```
 
-The macOS command has the same two-job default and must likewise run without a
-concurrent Rust-heavy build. The identical cache path convention keeps every
+The macOS command has the same four-job default and must likewise run without a
+concurrent native build. The identical cache path convention keeps every
 local CFL/fork checkout and worktree consistent while each host retains native
 artifacts.
 

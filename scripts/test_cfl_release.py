@@ -114,6 +114,29 @@ class CflReleaseTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("positive integer", result.stderr)
 
+    def test_rejects_non_native_source_build_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            helper = Path(temporary) / "codex-code-mode-host"
+            fake_executable(helper, b"helper fixture")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--target",
+                    "aarch64-apple-darwin",
+                    "--release-tag",
+                    "cfl/v0.154.0-rc.1",
+                    "--output-dir",
+                    temporary,
+                    "--code-mode-host-bin",
+                    str(helper),
+                ],
+                text=True,
+                capture_output=True,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("cross-compilation is unsupported", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
