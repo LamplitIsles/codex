@@ -25,14 +25,6 @@ python3 scripts/cfl_release.py \
   --code-mode-host-bin /path/to/official/codex-code-mode-host
 ```
 
-On a Linux host where systemd user scopes are available, the optional bounded
-wrapper prevents the build from exhausting the VM:
-
-```shell
-systemd-run --user --scope -p CPUQuota=400% -p MemoryHigh=6G -p MemoryMax=8G \
-  python3 scripts/cfl_release.py [the Linux command arguments above]
-```
-
 On the authorized Apple Silicon Mac, clone or check out the exact same tagged
 source and use a persistent Mac-local cache:
 
