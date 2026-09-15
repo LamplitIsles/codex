@@ -13,7 +13,9 @@ installed by the official Codex package. The command builds the forked `codex`
 binary from source; `--code-mode-host-bin` names that official helper.
 
 On Linux, keep Cargo artifacts outside the checkout so CFL's existing cache is
-reused:
+reused. Release compilation defaults to two Cargo jobs. Do not run it while a
+Rust test, formatter, or another release build is active; use `--jobs N` only
+for an explicit, capacity-reviewed override.
 
 ```shell
 python3 scripts/cfl_release.py \
@@ -21,6 +23,14 @@ python3 scripts/cfl_release.py \
   --output-dir /tmp/cfl-codex-release \
   --cargo-target-dir "${XDG_CACHE_HOME:-$HOME/.cache}/lamplitisles/codex-for-love/cargo-target" \
   --code-mode-host-bin /path/to/official/codex-code-mode-host
+```
+
+On a Linux host where systemd user scopes are available, the optional bounded
+wrapper prevents the build from exhausting the VM:
+
+```shell
+systemd-run --user --scope -p CPUQuota=400% -p MemoryHigh=6G -p MemoryMax=8G \
+  python3 scripts/cfl_release.py [the Linux command arguments above]
 ```
 
 On the authorized Apple Silicon Mac, clone or check out the exact same tagged
@@ -33,6 +43,11 @@ python3 scripts/cfl_release.py \
   --cargo-target-dir "${XDG_CACHE_HOME:-$HOME/.cache}/lamplitisles/codex-for-love/cargo-target" \
   --code-mode-host-bin /path/to/official/codex-code-mode-host
 ```
+
+The macOS command has the same two-job default and must likewise run without a
+concurrent Rust-heavy build. The identical cache path convention keeps every
+local CFL/fork checkout and worktree consistent while each host retains native
+artifacts.
 
 Each `tar.gz` contains `bin/codex`, `bin/codex-code-mode-host`, `LICENSE`,
 `NOTICE`, and `provenance.json`. After both host builds have placed their
