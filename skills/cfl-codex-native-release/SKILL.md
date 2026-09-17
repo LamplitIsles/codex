@@ -32,10 +32,12 @@ musl build and run only one heavy build at once.
 - Linux x64: use `scripts/cfl_release.py` and its prerequisite/assembly checks
   for `x86_64-unknown-linux-musl`. It packages `codex-app-server` together with
   the exact same-version official code-mode helper.
-- macOS ARM64: build natively on an ARM Mac with the same release profile and
-  shared cache convention, omitting the Linux target. Reuse the matching
-  official code-mode helper; do not cross-package a Linux executable or claim
-  Intel macOS support from an ARM build.
+- macOS ARM64: on the release checkout, run
+  `bash skills/cfl-codex-native-release/scripts/build-darwin-arm64.sh <cfl-release-tag>`.
+  It requires Homebrew Python at `/opt/homebrew/bin/python3`, reuses the
+  matching official code-mode helper, and writes a self-describing archive
+  under `.scratch/`. Do not cross-package a Linux executable or claim Intel
+  macOS support from an ARM build.
 
 For either platform, validate archive layout, executable hashes, target and
 runtime metadata before uploading. Keep the artifact's source revision and
