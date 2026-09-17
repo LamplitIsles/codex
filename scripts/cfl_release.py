@@ -214,7 +214,9 @@ def verify_linux_scope() -> None:
 
 
 def linux_scoped(
-    command: list[str], environment: dict[str, str], working_directory: Path | None = None
+    command: list[str],
+    environment: dict[str, str],
+    working_directory: Path | None = None,
 ) -> list[str]:
     systemd_run = shutil.which("systemd-run")
     if systemd_run is None:
@@ -474,7 +476,9 @@ def main() -> int:
     args = parse_args()
     if args.preflight_only:
         if args.target != LINUX_MUSL_TARGET or args.release_tag is not None:
-            raise RuntimeError("--preflight-only requires only --target x86_64-unknown-linux-musl")
+            raise RuntimeError(
+                "--preflight-only requires only --target x86_64-unknown-linux-musl"
+            )
         target_dir = args.cargo_target_dir or default_target_dir()
         preflight_linux_musl(target_dir, args.jobs)
         print("musl preflight: ready")
@@ -505,7 +509,8 @@ def main() -> int:
     else:
         target_dir = args.cargo_target_dir or default_target_dir()
         app_server = executable(
-            build_app_server(args.target, target_dir, args.jobs), "built Codex app-server"
+            build_app_server(args.target, target_dir, args.jobs),
+            "built Codex app-server",
         )
     archive = write_archive(
         args.output_dir.resolve(), args.release_tag, args.target, app_server, helper

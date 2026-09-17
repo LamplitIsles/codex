@@ -76,10 +76,7 @@ class CflReleaseTest(unittest.TestCase):
     def test_checksum_finalization_rejects_stale_archives(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
-            (
-                output
-                / "cfl-codex-app-server-stale-aarch64-apple-darwin.tar.gz"
-            ).touch()
+            (output / "cfl-codex-app-server-stale-aarch64-apple-darwin.tar.gz").touch()
             result = subprocess.run(
                 [
                     sys.executable,
