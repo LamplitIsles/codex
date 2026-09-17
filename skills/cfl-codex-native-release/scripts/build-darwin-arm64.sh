@@ -38,5 +38,7 @@ archive=$(find "$release_dir" -maxdepth 1 -type f -name '*.tar.gz' -print -quit)
 test -n "$archive"
 shasum -a 256 "$archive"
 tar -tzf "$archive"
-tar -xOzf "$archive" --wildcards '*/provenance.json'
+provenance_path=$(tar -tzf "$archive" | awk '/\/provenance\.json$/ { print; exit }')
+test -n "$provenance_path"
+tar -xOzf "$archive" "$provenance_path"
 printf 'archive=%s\n' "$archive"
