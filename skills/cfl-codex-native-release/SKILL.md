@@ -1,6 +1,6 @@
 ---
 name: cfl-codex-native-release
-description: Build and release the CFL-maintained Codex app-server artifacts from the fork's release branch for Linux x64 musl or macOS ARM64. Use for CFL native artifact releases, not upstream Codex releases or npm publication.
+description: Build CFL-maintained Codex app-server archives from the fork's release branch for Linux x64 musl or macOS ARM64, then hand them to CFL's local native npm publisher. Use for CFL native builds, not upstream Codex releases or npm publication.
 ---
 
 # CFL Codex native release
@@ -9,16 +9,15 @@ description: Build and release the CFL-maintained Codex app-server artifacts fro
 published from that branch rather than merged into upstream `main`; do not open
 or merge a PR as a substitute for the release workflow.
 
-This repository owns the native app-server artifact and the fork GitHub Release.
-The sibling `codex-for-love` repository owns the scoped npm packages, their
-provenance contracts, and main-package publication. Never publish upstream
-`@openai/codex` from this fork.
+This repository owns the native app-server build and local archive. The sibling
+`codex-for-love` repository owns the scoped npm packages and their local
+publication wizard. Never publish upstream `@openai/codex` from this fork.
 
 ## Prepare the exact source
 
 Read this repository's `AGENTS.md`, then inspect the CFL package identity
 contracts in `../codex-for-love/release/` before building. Confirm the branch,
-source revision, intended `cfl/...` release tag, target, supported Codex
+source revision, intended provenance release label, target, supported Codex
 version, output naming, and clean worktree. Push release commits to the source
 branch with `og`; do not merge the branch.
 
@@ -40,18 +39,16 @@ musl build and run only one heavy build at once.
   macOS support from an ARM build.
 
 For either platform, validate archive layout, executable hashes, target and
-runtime metadata before uploading. Keep the artifact's source revision and
-`cfl/...` tag available for CFL's native package provenance.
+runtime metadata before handoff. Keep the artifact's source revision and
+provenance release label available for CFL's native package provenance.
 
 ## Release and handoff
 
-After explicit authorization for the external release, use `gh` only for the
-fork GitHub Release/tag asset operation, as allowed by repository policy.
-Verify the uploaded asset digest and release/tag identity. Hand the exact asset
-URL, SHA-256 values, source revision, release tag, target, and helper version to
-the CFL release workflow.
+Do not create a fork GitHub Release or Git tag for this path. Hand the verified
+local archive, SHA-256 value, source revision, provenance release label, target,
+and helper version to the CFL release workflow. It copies both archives into
+`.scratch/native-release-<version>/` and runs its local native npm wizard.
 
 The follow-up native npm package is an independent CFL-repository operation:
 it may only package these verified bytes and must be published before a CFL main
-package pins it. A GitHub Release alone does not authorize deployment or npm
-publication.
+package pins it.
