@@ -67,6 +67,7 @@ fn user_message(text: &str) -> ResponseItem {
 fn compacted_user_message(text: &str) -> CompactedUserMessage {
     CompactedUserMessage {
         id: None,
+        turn_id: None,
         message: text.to_string(),
         internal_chat_message_metadata_passthrough: None,
         harness_metadata: None,
@@ -154,6 +155,7 @@ fn collect_annotated_user_messages_extracts_user_text_only() {
     assert_eq!(
         vec![CompactedUserMessage {
             id: None,
+            turn_id: None,
             message: "first".to_string(),
             internal_chat_message_metadata_passthrough: None,
             harness_metadata: Some(CodexHarnessMetadata::default()),
@@ -232,6 +234,7 @@ fn build_token_limited_compacted_history_truncates_overlong_user_messages() {
     let big = "word ".repeat(200);
     let user_message = CompactedUserMessage {
         id: Some(ResponseItemId::with_suffix("msg", "long-user")),
+        turn_id: None,
         message: big.clone(),
         internal_chat_message_metadata_passthrough: None,
         harness_metadata: Some(CodexHarnessMetadata::default()),
@@ -303,6 +306,7 @@ fn build_compacted_history_preserves_user_message_passthrough_metadata() {
         Vec::new(),
         &[CompactedUserMessage {
             id: Some(ResponseItemId::with_suffix("msg", "user")),
+            turn_id: Some("turn-1".to_string()),
             message: "first user message".to_string(),
             internal_chat_message_metadata_passthrough: Some(
                 InternalChatMessageMetadataPassthrough {

@@ -363,6 +363,14 @@ async fn run_compact_task_inner_impl(
         CompactedMessageIdentity::Regenerate
     };
     let user_messages = collect_annotated_user_messages(history_items, identity);
+    let user_messages = if turn_context.config.experimental_local_compaction {
+        user_messages
+            .into_iter()
+            .filter(|message| message.turn_id.as_deref() == Some(turn_context.sub_id.as_str()))
+            .collect()
+    } else {
+        user_messages
+    };
 
     let mut new_history = build_compacted_history(Vec::new(), &user_messages, &summary_text);
     if let Some(summary_item) = new_history.last_mut() {
@@ -537,6 +545,7 @@ pub(crate) struct CompactedUserMessage {
     // Keep source identity even when compaction shortens the text, so rollback can
     // correlate the rebuilt message with thread-owned retained evidence.
     id: Option<ResponseItemId>,
+    turn_id: Option<String>,
     message: String,
     internal_chat_message_metadata_passthrough: Option<InternalChatMessageMetadataPassthrough>,
     harness_metadata: Option<CodexHarnessMetadata>,
@@ -583,6 +592,7 @@ fn compacted_user_message(
     }
     Some(CompactedUserMessage {
         id: item.id().cloned(),
+        turn_id: item.turn_id().map(ToOwned::to_owned),
         message: user.message(),
         internal_chat_message_metadata_passthrough: match item {
             ResponseItem::Message {
@@ -702,6 +712,7 @@ fn build_compacted_history_with_limit(
                     truncate_text(&message.message, TruncationPolicy::Tokens(remaining));
                 selected_messages.push(CompactedUserMessage {
                     id: message.id.clone(),
+                    turn_id: message.turn_id.clone(),
                     message: truncated,
                     internal_chat_message_metadata_passthrough: message
                         .internal_chat_message_metadata_passthrough
