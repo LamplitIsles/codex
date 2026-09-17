@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Build a CFL Codex release archive from this exact checkout."""
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import io
