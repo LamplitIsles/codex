@@ -808,7 +808,9 @@ async fn explicit_local_compaction_override_routes_builtin_openai_manual() -> Re
         let _ = config.features.enable(Feature::RemoteCompactionV2);
         set_test_compact_prompt(config);
     });
-    let codex = builder.build(&server).await?.codex;
+    let test = builder.build(&server).await?;
+    let rollout_path = test.session_configured.rollout_path.expect("rollout path");
+    let codex = test.codex;
 
     codex
         .start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
@@ -843,10 +845,25 @@ async fn explicit_local_compaction_override_routes_builtin_openai_manual() -> Re
             .iter()
             .any(|item| item["type"] == "compaction_trigger")
     );
+    let follow_up = requests[2].body_json().to_string();
     assert!(body_contains_text(
-        &requests[2].body_json().to_string(),
-        &summary_with_prefix(SUMMARY_TEXT),
+        &follow_up,
+        &summary_with_prefix(SUMMARY_TEXT)
     ));
+    assert!(
+        !body_contains_text(&follow_up, "before explicit local compact"),
+        "CFL replacement should not retain a completed user turn"
+    );
+
+    codex.submit(Op::Shutdown).await?;
+    wait_for_event(&codex, |ev| matches!(ev, EventMsg::ShutdownComplete)).await;
+    let replacement_history = replacement_history_from_rollout(&rollout_path)?;
+    assert_eq!(replacement_history.len(), 1);
+    assert_eq!(
+        replacement_history[0]["content"][0]["text"],
+        summary_with_prefix(SUMMARY_TEXT),
+        "CFL manual compaction should persist only its checkpoint"
+    );
 
     Ok(())
 }
@@ -1955,7 +1972,9 @@ async fn auto_compact_runs_after_token_limit_hit() {
         set_test_compact_prompt(config);
         config.model_auto_compact_token_limit = Some(200_000);
     });
-    let codex = builder.build(&server).await.unwrap().codex;
+    let test = builder.build(&server).await.unwrap();
+    let rollout_path = test.session_configured.rollout_path.expect("rollout path");
+    let codex = test.codex;
 
     codex
         .start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
@@ -2083,12 +2102,12 @@ async fn auto_compact_runs_after_token_limit_hit() {
         })
         .collect();
     assert!(
-        user_texts.iter().any(|text| text == FIRST_AUTO_MSG),
-        "auto compact follow-up request should include the first user message"
+        !user_texts.iter().any(|text| text == FIRST_AUTO_MSG),
+        "CFL pre-turn compaction should exclude the first completed user message"
     );
     assert!(
-        user_texts.iter().any(|text| text == SECOND_AUTO_MSG),
-        "auto compact follow-up request should include the second user message"
+        !user_texts.iter().any(|text| text == SECOND_AUTO_MSG),
+        "CFL pre-turn compaction should exclude the second completed user message"
     );
     assert!(
         user_texts.iter().any(|text| text == POST_AUTO_USER_MSG),
@@ -2099,6 +2118,16 @@ async fn auto_compact_runs_after_token_limit_hit() {
             .iter()
             .any(|text| text.contains(prefixed_auto_summary)),
         "auto compact follow-up request should include the summary message"
+    );
+
+    codex.submit(Op::Shutdown).await.unwrap();
+    wait_for_event(&codex, |ev| matches!(ev, EventMsg::ShutdownComplete)).await;
+    let replacement_history = replacement_history_from_rollout(&rollout_path).unwrap();
+    assert_eq!(replacement_history.len(), 1);
+    assert_eq!(
+        replacement_history[0]["content"][0]["text"],
+        summary_with_prefix(AUTO_SUMMARY_TEXT),
+        "CFL pre-turn compaction should persist only its checkpoint"
     );
 }
 
@@ -4546,6 +4575,100 @@ async fn snapshot_request_shape_mid_turn_continuation_compaction() {
             ]
         )
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cfl_mid_turn_compaction_retains_only_current_user_turn() -> Result<()> {
+    skip_if_no_network!(Ok(()));
+
+    const EARLIER_USER_MSG: &str = "completed turn before CFL mid-turn compact";
+    let server = start_mock_server().await;
+    let context_window = 100;
+    let limit = context_window * 90 / 100;
+    let over_limit_tokens = context_window * 95 / 100 + 1;
+    let request_log = mount_sse_sequence(
+        &server,
+        vec![
+            sse(vec![
+                ev_assistant_message("earlier", FIRST_REPLY),
+                ev_completed_with_tokens("earlier", /*total_tokens*/ 10),
+            ]),
+            sse(vec![
+                ev_function_call(DUMMY_CALL_ID, DUMMY_FUNCTION_NAME, "{}"),
+                ev_completed_with_tokens("tool-turn", over_limit_tokens),
+            ]),
+            sse(vec![
+                ev_assistant_message("compact", AUTO_SUMMARY_TEXT),
+                ev_completed_with_tokens("compact", /*total_tokens*/ 10),
+            ]),
+            sse(vec![
+                ev_assistant_message("continued", FINAL_REPLY),
+                ev_completed_with_tokens("continued", /*total_tokens*/ 10),
+            ]),
+        ],
+    )
+    .await;
+
+    let model_provider = non_openai_model_provider(&server);
+    let test = test_codex()
+        .with_config(move |config| {
+            config.model_provider = model_provider;
+            config.experimental_local_compaction = true;
+            set_test_compact_prompt(config);
+            config.model_context_window = Some(context_window);
+            config.model_auto_compact_token_limit = Some(limit);
+        })
+        .build(&server)
+        .await?;
+    let rollout_path = test.session_configured.rollout_path.expect("rollout path");
+    let codex = test.codex;
+
+    for user in [EARLIER_USER_MSG, FUNCTION_CALL_LIMIT_MSG] {
+        codex
+            .start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
+                text: user.into(),
+                text_elements: Vec::new(),
+            }]))
+            .await?;
+        wait_for_event(&codex, |event| matches!(event, EventMsg::TurnComplete(_))).await;
+    }
+
+    let requests = request_log.requests();
+    assert_eq!(requests.len(), 4);
+    let continuation = requests[3].body_json().to_string();
+    assert!(body_contains_text(&continuation, FUNCTION_CALL_LIMIT_MSG));
+    assert!(body_contains_text(
+        &continuation,
+        &summary_with_prefix(AUTO_SUMMARY_TEXT)
+    ));
+    assert!(
+        !body_contains_text(&continuation, EARLIER_USER_MSG),
+        "CFL mid-turn continuation must exclude completed earlier user turns"
+    );
+
+    codex.submit(Op::Shutdown).await?;
+    wait_for_event(&codex, |event| matches!(event, EventMsg::ShutdownComplete)).await;
+    let replacement_history = replacement_history_from_rollout(&rollout_path)?;
+    let replacement_text = replacement_history.to_string();
+    assert!(body_contains_text(
+        &replacement_text,
+        FUNCTION_CALL_LIMIT_MSG
+    ));
+    assert!(
+        !body_contains_text(&replacement_text, EARLIER_USER_MSG),
+        "persisted CFL mid-turn replacement must exclude completed earlier user turns"
+    );
+    let expected_summary = summary_with_prefix(AUTO_SUMMARY_TEXT);
+    assert_eq!(
+        replacement_history
+            .last()
+            .and_then(|item| item["content"].as_array())
+            .and_then(|content| content.first())
+            .and_then(|item| item["text"].as_str()),
+        Some(expected_summary.as_str())
+    );
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
