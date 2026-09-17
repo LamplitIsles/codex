@@ -1,0 +1,3 @@
+interface:
+  display_name: "CFL Codex native release"
+  short_description: "Build CFL fork native artifacts"
