@@ -28,7 +28,10 @@ class CflReleaseTest(unittest.TestCase):
             fake_executable(app_server, b"app-server fixture")
             fake_executable(helper, b"helper fixture")
             output = root / "output"
-            for target in ("x86_64-unknown-linux-musl",):
+            for target in (
+                "x86_64-unknown-linux-musl",
+                "aarch64-apple-darwin",
+            ):
                 subprocess.check_call(
                     [
                         sys.executable,
@@ -46,7 +49,7 @@ class CflReleaseTest(unittest.TestCase):
                     ]
                 )
             archives = sorted(output.glob("*.tar.gz"))
-            self.assertEqual(len(archives), 1)
+            self.assertEqual(len(archives), 2)
             subprocess.check_call(
                 [
                     sys.executable,
@@ -58,20 +61,26 @@ class CflReleaseTest(unittest.TestCase):
             )
             manifest = (output / "SHA256SUMS").read_text()
             self.assertTrue(all(archive.name in manifest for archive in archives))
-            with tarfile.open(archives[0]) as archive:
-                names = archive.getnames()
-                self.assertTrue(
-                    any(name.endswith("/bin/codex-app-server") for name in names)
-                )
-                self.assertTrue(
-                    any(name.endswith("/bin/codex-code-mode-host") for name in names)
-                )
-                provenance_name = next(
-                    name for name in names if name.endswith("/provenance.json")
-                )
-                provenance = json.load(archive.extractfile(provenance_name))
-            self.assertEqual(provenance["target"], "x86_64-unknown-linux-musl")
-            self.assertFalse(str(root) in json.dumps(provenance))
+            archive_targets = set()
+            for archive_path in archives:
+                with tarfile.open(archive_path) as archive:
+                    names = archive.getnames()
+                    self.assertTrue(
+                        any(name.endswith("/bin/codex-app-server") for name in names)
+                    )
+                    self.assertTrue(
+                        any(name.endswith("/bin/codex-code-mode-host") for name in names)
+                    )
+                    provenance_name = next(
+                        name for name in names if name.endswith("/provenance.json")
+                    )
+                    provenance = json.load(archive.extractfile(provenance_name))
+                archive_targets.add(provenance["target"])
+                self.assertFalse(str(root) in json.dumps(provenance))
+            self.assertEqual(
+                archive_targets,
+                {"x86_64-unknown-linux-musl", "aarch64-apple-darwin"},
+            )
 
     def test_checksum_finalization_rejects_stale_archives(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -115,30 +124,6 @@ class CflReleaseTest(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("positive integer", result.stderr)
-
-    def test_rejects_unsupported_source_build_target(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            helper = Path(temporary) / "codex-code-mode-host"
-            fake_executable(helper, b"helper fixture")
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--target",
-                    "aarch64-apple-darwin",
-                    "--release-tag",
-                    "cfl/v0.154.0-rc.1",
-                    "--output-dir",
-                    temporary,
-                    "--code-mode-host-bin",
-                    str(helper),
-                ],
-                text=True,
-                capture_output=True,
-            )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("invalid choice", result.stderr)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,7 @@ from pathlib import Path
 
 SUPPORTED_TARGETS = {
     "x86_64-unknown-linux-musl",
+    "aarch64-apple-darwin",
 }
 LINUX_MUSL_TARGET = "x86_64-unknown-linux-musl"
 REPO_ROOT = Path(__file__).resolve().parents[1]
