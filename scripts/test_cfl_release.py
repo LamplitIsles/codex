@@ -39,7 +39,7 @@ class CflReleaseTest(unittest.TestCase):
                         "--target",
                         target,
                         "--release-tag",
-                        "cfl/v0.154.0-rc.1",
+                        "cfl/v0.156.1-rc.1",
                         "--output-dir",
                         str(output),
                         "--app-server-bin",
@@ -124,6 +124,7 @@ class CflReleaseTest(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("positive integer", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

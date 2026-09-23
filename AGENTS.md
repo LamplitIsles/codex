@@ -1,7 +1,8 @@
 # CFL local release builds
 
-`cfl/0.154` is a pinned release-maintenance line. Its local release entry
-point is `scripts/cfl_release.py`, not a general Rust build replacement.
+`cfl/local-install` is CFL's native-artifact release branch. Read
+`skills/cfl-codex-native-release/SKILL.md` before building either supported
+target. Its local release entry point is `scripts/cfl_release.py`.
 
 - Use the native shared cache on every host:
   `${XDG_CACHE_HOME:-$HOME/.cache}/lamplitisles/codex-for-love/cargo-target`.
@@ -23,8 +24,8 @@ point is `scripts/cfl_release.py`, not a general Rust build replacement.
   Run one heavy release build at a time. Stop and report widespread cache
   misses rather than starting a cold build.
 - For this packaging path, use the hermetic release-assembly test and artifact
-  checks; do not start the Rust test graph. No other platform build is
-  currently authorized.
+  checks; do not start the Rust test graph. macOS ARM64 builds use the native
+  Mac host and the same release profile.
 
 # Rust/codex-rs
 
