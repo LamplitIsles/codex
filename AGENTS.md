@@ -20,7 +20,7 @@ target. Its local release entry point is `scripts/cfl_release.py`.
   `CARGO_PROFILE_RELEASE_OPT_LEVEL=1`, and
   `CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16`.
 - On Linux, a release build must first prove its systemd user scope enforces
-  `MemoryMax=6G`, `MemorySwapMax=512M`, `CPUQuota=800%`, and `TasksMax=256`.
+  `MemoryMax=6G`, `MemorySwapMax=512M`, `CPUQuota=400%`, and `TasksMax=256`.
   Run one heavy release build at a time. Stop and report widespread cache
   misses rather than starting a cold build.
 - For this packaging path, use the hermetic release-assembly test and artifact

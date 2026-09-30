@@ -1,14 +1,14 @@
 # CFL native release source
 
 `cfl/local-install` carries CFL's app-server and local compaction changes on
-upstream `rust-v0.156.1` (peeled commit
-`b412ff32c417f855c2b2d1581b77058eed87c84b`). This branch produces
+upstream `rust-v0.159.1` (peeled commit
+`8e68a98ef03cdde76d2e6800791ebdf1b3b95b24`). This branch produces
 Linux x64 musl and macOS ARM64 archives for the CFL scoped npm packages; it
 does not publish upstream `@openai/codex` or deploy a Partner.
 
 Use `skills/cfl-codex-native-release/SKILL.md` for the current build and
 handoff sequence. Both hosts must build the same reviewed source revision and
-package the `codex-code-mode-host` from the official Codex **0.156.1** package
+package the `codex-code-mode-host` from the official Codex **0.159.1** package
 for their own target. `scripts/cfl_release.py` records source revision, target,
 version, release label, and executable hashes in each archive. The sibling
 `codex-for-love/skills/cfl-release/SKILL.md` owns native npm packaging,

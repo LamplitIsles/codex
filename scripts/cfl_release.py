@@ -34,13 +34,13 @@ RELEASE_PROFILE_ENV = {
 LINUX_SCOPE_PROPERTIES = {
     "MemoryMax": "6G",
     "MemorySwapMax": "512M",
-    "CPUQuota": "800%",
+    "CPUQuota": "400%",
     "TasksMax": "256",
 }
 LINUX_SCOPE_EXPECTED = {
     "MemoryMax": "6442450944",
     "MemorySwapMax": "536870912",
-    "CPUQuotaPerSecUSec": "8s",
+    "CPUQuotaPerSecUSec": "4s",
     "TasksMax": "256",
 }
 LINUX_HOST_TOOLCHAIN = Path("/run/current-system/sw/bin")

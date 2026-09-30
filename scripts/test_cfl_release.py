@@ -69,7 +69,9 @@ class CflReleaseTest(unittest.TestCase):
                         any(name.endswith("/bin/codex-app-server") for name in names)
                     )
                     self.assertTrue(
-                        any(name.endswith("/bin/codex-code-mode-host") for name in names)
+                        any(
+                            name.endswith("/bin/codex-code-mode-host") for name in names
+                        )
                     )
                     provenance_name = next(
                         name for name in names if name.endswith("/provenance.json")
