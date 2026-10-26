@@ -15,7 +15,11 @@ python_bin=/opt/homebrew/bin/python3
 test -x "$git_bin"
 test -x "$python_bin"
 cd "$repo_root"
-test "$("$git_bin" rev-parse --abbrev-ref HEAD)" = "cfl/local-install"
+case "$("$git_bin" rev-parse --abbrev-ref HEAD)" in
+  cfl/local-install|cfl/0.164-native) ;;
+  *) echo "build requires the CFL release or reviewed 0.164 branch" >&2; exit 1 ;;
+esac
+"$git_bin" merge-base --is-ancestor 880185c212186edc3211c02eb36c7dd7584917f7 HEAD
 test -z "$("$git_bin" status --porcelain)"
 
 test -x "$helper"

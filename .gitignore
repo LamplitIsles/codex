@@ -94,3 +94,6 @@ CHANGELOG.ignore.md
 # Python bytecode files
 __pycache__/
 *.pyc
+
+# CFL local build evidence and archives
+.scratch/

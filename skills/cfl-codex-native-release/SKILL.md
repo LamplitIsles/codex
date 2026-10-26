@@ -6,8 +6,9 @@ description: Build CFL-maintained Codex app-server archives from the fork's rele
 # CFL Codex native release
 
 `cfl/local-install` is CFL's native-artifact release source. It is deliberately
-published from that branch rather than merged into upstream `main`; do not open
-or merge a PR as a substitute for the release workflow.
+published from that branch rather than merged into upstream `main`. Upgrade
+PRs target `cfl/local-install`; build the reviewed `cfl/0.164-native` candidate
+with its recovered release history intact.
 
 This repository owns the native app-server build and local archive. The sibling
 `codex-for-love` repository owns the scoped npm packages and their local
@@ -16,7 +17,8 @@ publication wizard. Never publish upstream `@openai/codex` from this fork.
 ## Prepare the exact source
 
 Read this repository's `AGENTS.md`, then inspect the CFL package identity
-contracts in `../codex-for-love/release/` before building. Confirm the branch,
+contracts in its `skills/cfl-release/SKILL.md` before building. If the downstream
+publisher is being recovered separately, record that handoff limitation. Confirm the branch,
 source revision, intended provenance release label, target, supported Codex
 version, output naming, and clean worktree. Push release commits to the source
 branch with `og`; do not merge the branch.

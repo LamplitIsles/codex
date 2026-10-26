@@ -9,7 +9,11 @@ target. Its local release entry point is `scripts/cfl_release.py`.
   Keep existing artifacts until cache reuse has been inspected.
 - Before a Linux release build, use the explicit host Rust/Cargo executables
   rather than a Nix development shell, whose Rust selection need not match the
-  reusable native cache. Use the fixed target musl compiler/linker and do not
+  reusable native cache. On non-Nix hosts, set `CFL_RUST_TOOLCHAIN_BIN` to
+  the explicit pinned Rust bin directory and `CFL_MUSL_TOOLCHAIN_BIN` to the
+  musl compiler bin directory (target-prefixed gcc/g++ names). Keep `pkg-config`
+  on PATH. The Linux preflight verifies Rust 1.99.1 and a static musl probe.
+  Use the fixed target musl compiler/linker and do not
   pass GNU OpenSSL paths into the build.
 - Build `codex-app-server`/`codex-app-server` with `--locked --release
   --target x86_64-unknown-linux-musl`, using four jobs by default. Preserve the release

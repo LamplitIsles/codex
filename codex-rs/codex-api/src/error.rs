@@ -1,6 +1,7 @@
 use crate::rate_limits::RateLimitError;
 use codex_client::TransportError;
 use codex_http_client::RetryAfter;
+use codex_protocol::error::ResponseIncompleteError;
 use codex_protocol::protocol::MisalignmentErrorDetails;
 use http::StatusCode;
 use serde_json::Value;
@@ -14,6 +15,10 @@ pub enum ApiError {
     Api { status: StatusCode, message: String },
     #[error("stream error: {0}")]
     Stream(String),
+    #[error("stream error: Incomplete response returned, reason: content_filter")]
+    ContentFilter,
+    #[error(transparent)]
+    ResponseIncomplete(Box<ResponseIncompleteError>),
     #[error("context window exceeded")]
     ContextWindowExceeded,
     #[error("quota exceeded")]
@@ -60,4 +65,10 @@ impl From<RateLimitError> for ApiError {
 pub(crate) fn parse_flex_unavailable(error: &Value) -> Option<ApiError> {
     (error.get("code").and_then(Value::as_str) == Some("flex_unavailable"))
         .then_some(ApiError::FlexUnavailable)
+}
+
+impl From<crate::AuthError> for ApiError {
+    fn from(error: crate::AuthError) -> Self {
+        Self::Transport(error.into())
+    }
 }

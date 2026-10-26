@@ -43,13 +43,18 @@ LINUX_SCOPE_EXPECTED = {
     "CPUQuotaPerSecUSec": "4s",
     "TasksMax": "256",
 }
-LINUX_HOST_TOOLCHAIN = Path("/run/current-system/sw/bin")
+LINUX_HOST_TOOLCHAIN = Path(
+    os.environ.get("CFL_RUST_TOOLCHAIN_BIN", "/run/current-system/sw/bin")
+)
+LINUX_MUSL_TOOLCHAIN = Path(
+    os.environ.get("CFL_MUSL_TOOLCHAIN_BIN", "/run/current-system/sw/bin")
+)
 LINUX_MUSL_ENV = {
-    "CC": "/run/current-system/sw/bin/x86_64-unknown-linux-musl-gcc",
-    "CXX": "/run/current-system/sw/bin/x86_64-unknown-linux-musl-g++",
+    "CC": str(LINUX_MUSL_TOOLCHAIN / "x86_64-unknown-linux-musl-gcc"),
+    "CXX": str(LINUX_MUSL_TOOLCHAIN / "x86_64-unknown-linux-musl-g++"),
     "CFLAGS": "-pthread",
     "CXXFLAGS": "-pthread",
-    "PKG_CONFIG": "/run/current-system/sw/bin/pkg-config",
+    "PKG_CONFIG": shutil.which("pkg-config") or "pkg-config",
     "PKG_CONFIG_ALLOW_CROSS": "1",
     "PKG_CONFIG_LIBDIR": "/nonexistent",
     "PKG_CONFIG_PATH": "/nonexistent",
@@ -285,7 +290,7 @@ def linux_scoped(
 def linux_musl_preflight_command(workspace: Path) -> list[str]:
     """Validate the isolated musl compiler and linker in the release scope."""
     return [
-        host_executable("bash"),
+        shutil.which("bash") or "bash",
         "-c",
         """
             set -eu
@@ -293,10 +298,10 @@ def linux_musl_preflight_command(workspace: Path) -> list[str]:
             expected_workspace="$2"
             test "$PWD" = "$expected_workspace"
             test -f Cargo.toml
-            "$RUSTC" -vV | grep -Fqx 'rustc 1.97.1 (8bab26f4f 2026-07-14)'
-            "$RUSTC" -vV | grep -Fqx 'commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452'
-            "$RUSTC" -vV | grep -Fqx 'LLVM version: 22.1.6'
-            "$cargo_bin" -V | grep -Fqx 'cargo 1.97.1 (c980f4866 2026-06-30)'
+            "$RUSTC" -vV | grep -Fqx 'rustc 1.99.1 (58cf8f9c3 2026-10-13)'
+            "$RUSTC" -vV | grep -Fqx 'commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67'
+            "$RUSTC" -vV | grep -Fqx 'LLVM version: 23.1.1'
+            "$cargo_bin" -V | grep -Fqx 'cargo 1.99.1 (5f94df478 2026-08-27)'
             set -- "$("$RUSTC" --print target-libdir --target x86_64-unknown-linux-musl)"/libstd-*.rlib
             test -f "$1"
             "$CC" --version >/dev/null
