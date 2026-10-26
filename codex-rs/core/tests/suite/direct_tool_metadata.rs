@@ -442,7 +442,7 @@ async fn direct_call_metadata_during_compaction_respects_provider_support(
         RemoteCompactionSupport::Unsupported => assert!(compacted.iter().any(|item| {
             item["role"] == "user"
                 && item["content"][0]["text"]
-                    == format!("{}\n{summary}", codex_core::compact::SUMMARY_PREFIX)
+                    == format!("{}\n\n{summary}", codex_core::compact::SUMMARY_PREFIX)
         })),
         RemoteCompactionSupport::V2 => {
             assert!(compacted.iter().any(|item| {

@@ -352,7 +352,7 @@ async fn guardian_attributes_local_compaction_to_assistant(
         .collect::<Vec<_>>();
     assert_eq!(reviews.len(), 1);
     let text = reviews[0].message_input_texts("user").join("\n");
-    let summary = format!("{}\n{SUMMARY}", codex_core::compact::SUMMARY_PREFIX);
+    let summary = format!("{}\n\n{SUMMARY}", codex_core::compact::SUMMARY_PREFIX);
     match transcript_format {
         TranscriptFormat::Line => {
             assert!(text.contains(&format!("assistant: {summary}")), "{text}");

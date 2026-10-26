@@ -229,7 +229,7 @@ async fn local_compaction_retries_preserve_instructions_and_tool_metadata(
         }
     }
     let compacted_history = session.clone_history().await;
-    let expected_summary = format!("{SUMMARY_PREFIX}\nThe prior calls finished.");
+    let expected_summary = format!("{SUMMARY_PREFIX}\n\nThe prior calls finished.");
     assert!(compacted_history.raw_items().any(|item| {
         matches!(item, ResponseItem::Message { role, content, .. }
             if role == "user"

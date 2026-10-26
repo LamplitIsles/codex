@@ -66,7 +66,9 @@ impl Normalizer {
         {
             let marker = format!("<{segment}>");
             if segment == "COMPACTION_SUMMARY"
-                && let Some((_, summary)) = text.split_once('\n')
+                && let Some(summary) = text
+                    .strip_prefix(codex_core::compact::SUMMARY_PREFIX)
+                    .and_then(|summary| summary.strip_prefix("\n\n"))
                 && !summary.is_empty()
             {
                 // Only the standard preamble is guidance; the generated summary is conversation data.
@@ -311,10 +313,7 @@ fn known_segment_name(text: &str, source: TextSource<'_>) -> Option<String> {
                 "You are performing a CONTEXT CHECKPOINT COMPACTION.",
                 "SUMMARIZATION_PROMPT",
             ),
-            (
-                "Another language model started to solve this problem",
-                "COMPACTION_SUMMARY",
-            ),
+            (codex_core::compact::SUMMARY_PREFIX, "COMPACTION_SUMMARY"),
         ],
         _ => &[],
     };

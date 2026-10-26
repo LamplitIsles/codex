@@ -673,7 +673,10 @@ fn rewritten_segments_share_one_tag_format_and_keep_compaction_data() {
         ),
         message(
             "user",
-            "Another language model started to solve this problem.\nGenerated summary",
+            &format!(
+                "{}\n\nGenerated summary",
+                codex_core::compact::SUMMARY_PREFIX
+            ),
         ),
     ];
     let original = rewritten(&items);
@@ -697,7 +700,7 @@ fn rewritten_segments_share_one_tag_format_and_keep_compaction_data() {
     let full = detailed(&items);
     assert!(full.contains("Routine guidance."));
     assert!(full.contains("Project rules"));
-    assert!(full.contains("Another language model started to solve this problem."));
+    assert!(full.contains(codex_core::compact::SUMMARY_PREFIX));
     assert!(full.contains("Generated summary"));
 }
 
