@@ -26,8 +26,14 @@ def main() -> int:
         parser.error("free disk limit must be nonnegative")
 
     deadline = time.monotonic() + args.seconds
-    child = subprocess.Popen(command, start_new_session=True)
+
+    def terminate(signum, _frame):
+        raise SystemExit(128 + signum)
+
+    previous_sigterm = signal.signal(signal.SIGTERM, terminate)
+    child = None
     try:
+        child = subprocess.Popen(command, start_new_session=True)
         while child.poll() is None:
             output = subprocess.check_output(["ps", "-axo", "pgid=,rss="], text=True)
             usage = [
@@ -54,10 +60,14 @@ def main() -> int:
         # This group belongs exclusively to the command launched above. Kill any
         # surviving descendants on failure, interruption or parent completion.
         try:
-            os.killpg(child.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        child.wait()
+            if child is not None:
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                child.wait()
+        finally:
+            signal.signal(signal.SIGTERM, previous_sigterm)
 
 
 if __name__ == "__main__":
