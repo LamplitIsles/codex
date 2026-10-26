@@ -786,6 +786,31 @@ async fn summarize_context_three_requests_and_instructions(
     Ok(())
 }
 
+fn assert_cfl_replacement_history(history: &[Value], expected_user_texts: &[&str], summary: &str) {
+    let user_texts: Vec<&str> = history
+        .iter()
+        .filter(|item| {
+            item["internal_chat_message_metadata_passthrough"]["content_item_kinds"]
+                .as_array()
+                .is_some_and(|kinds| kinds.iter().any(|kind| kind == "user.text"))
+        })
+        .filter_map(|item| item["content"][0]["text"].as_str())
+        .collect();
+    assert_eq!(user_texts, expected_user_texts);
+    assert_eq!(
+        history.last().map(|item| &item["content"][0]["text"]),
+        Some(&json!(summary_with_prefix(summary))),
+        "the checkpoint remains last after native prefix/context restoration"
+    );
+    assert!(
+        history
+            .iter()
+            .any(|item| item.to_string().contains("CFL_REQUIRED_CONTEXT")),
+        "compaction must persist necessary native developer context"
+    );
+    assert!(!history.iter().any(|item| item["role"] == "assistant"));
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn explicit_local_compaction_override_routes_builtin_openai_manual() -> Result<()> {
     skip_if_no_network!(Ok(()));
@@ -811,6 +836,8 @@ async fn explicit_local_compaction_override_routes_builtin_openai_manual() -> Re
     let mut builder = test_codex().with_config(move |config| {
         config.model_provider = model_provider;
         config.experimental_local_compaction = true;
+        config.developer_instructions = Some("CFL_REQUIRED_CONTEXT".to_string());
+        config.model_post_turn_compact_threshold_percent = 0;
         config.features.enable(Feature::AsyncCompaction).unwrap();
         set_test_compact_prompt(config);
     });
@@ -864,12 +891,7 @@ async fn explicit_local_compaction_override_routes_builtin_openai_manual() -> Re
     codex.submit(Op::Shutdown).await?;
     wait_for_event(&codex, |ev| matches!(ev, EventMsg::ShutdownComplete)).await;
     let replacement_history = replacement_history_from_rollout(&rollout_path)?;
-    assert_eq!(replacement_history.len(), 1);
-    assert_eq!(
-        replacement_history[0]["content"][0]["text"],
-        summary_with_prefix(SUMMARY_TEXT),
-        "CFL manual compaction should persist only its checkpoint"
-    );
+    assert_cfl_replacement_history(&replacement_history, &[], SUMMARY_TEXT);
 
     Ok(())
 }
@@ -2276,6 +2298,8 @@ async fn auto_compact_runs_after_token_limit_hit() {
     let mut builder = test_codex().with_config(move |config| {
         config.model_provider = model_provider;
         config.experimental_local_compaction = true;
+        config.developer_instructions = Some("CFL_REQUIRED_CONTEXT".to_string());
+        config.model_post_turn_compact_threshold_percent = 0;
         config.features.enable(Feature::AsyncCompaction).unwrap();
         set_test_compact_prompt(config);
         config.model_auto_compact_token_limit = Some(200_000);
@@ -2423,12 +2447,7 @@ async fn auto_compact_runs_after_token_limit_hit() {
     codex.submit(Op::Shutdown).await.unwrap();
     wait_for_event(&codex, |ev| matches!(ev, EventMsg::ShutdownComplete)).await;
     let replacement_history = replacement_history_from_rollout(&rollout_path).unwrap();
-    assert_eq!(replacement_history.len(), 1);
-    assert_eq!(
-        replacement_history[0]["content"][0]["text"],
-        summary_with_prefix(AUTO_SUMMARY_TEXT),
-        "CFL pre-turn compaction should persist only its checkpoint"
-    );
+    assert_cfl_replacement_history(&replacement_history, &[], AUTO_SUMMARY_TEXT);
 }
 
 // Windows CI only: bump to 4 workers to prevent SSE/event starvation and test timeouts.
@@ -5328,6 +5347,8 @@ async fn cfl_mid_turn_compaction_retains_only_current_user_turn() -> Result<()> 
         .with_config(move |config| {
             config.model_provider = model_provider;
             config.experimental_local_compaction = true;
+            config.developer_instructions = Some("CFL_REQUIRED_CONTEXT".to_string());
+            config.model_post_turn_compact_threshold_percent = 0;
             set_test_compact_prompt(config);
             config.model_context_window = Some(context_window);
             config.model_auto_compact_token_limit = Some(limit);
@@ -5372,14 +5393,10 @@ async fn cfl_mid_turn_compaction_retains_only_current_user_turn() -> Result<()> 
         !body_contains_text(&replacement_text, EARLIER_USER_MSG),
         "persisted CFL mid-turn replacement must exclude completed earlier user turns"
     );
-    let expected_summary = summary_with_prefix(AUTO_SUMMARY_TEXT);
-    assert_eq!(
-        replacement_history
-            .last()
-            .and_then(|item| item["content"].as_array())
-            .and_then(|content| content.first())
-            .and_then(|item| item["text"].as_str()),
-        Some(expected_summary.as_str())
+    assert_cfl_replacement_history(
+        &replacement_history,
+        &[FUNCTION_CALL_LIMIT_MSG],
+        AUTO_SUMMARY_TEXT,
     );
 
     Ok(())

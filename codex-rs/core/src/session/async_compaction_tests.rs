@@ -9,10 +9,14 @@ use codex_protocol::protocol::TokenUsage;
 use core_test_support::responses;
 use pretty_assertions::assert_eq;
 
-#[test_case::test_case(CompactionTrigger::Auto; "optional ready adoption")]
-#[test_case::test_case(CompactionTrigger::Manual; "manual ready reuse")]
+#[test_case::test_case(CompactionTrigger::Auto, false; "optional ready adoption")]
+#[test_case::test_case(CompactionTrigger::Manual, false; "manual ready reuse")]
+#[test_case::test_case(CompactionTrigger::Auto, true; "CFL suppresses eligible speculation")]
 #[tokio::test]
-async fn cancelled_turn_skips_launch_but_preserves_existing_work(trigger: CompactionTrigger) {
+async fn eligible_speculation_obeys_cancellation_and_local_override(
+    trigger: CompactionTrigger,
+    local_compaction: bool,
+) {
     let phase = CompactionPhase::MidTurn;
     let server = responses::start_mock_server().await;
     let mut provider =
@@ -29,6 +33,8 @@ async fn cancelled_turn_skips_launch_but_preserves_existing_work(trigger: Compac
                 config.model = Some("gpt-5.2".to_string());
                 config.model_context_window = Some(100_000);
                 config.model_auto_compact_token_limit = Some(90_000);
+                config.experimental_local_compaction = local_compaction;
+                config.async_compaction_threshold_percent = 65;
                 config.model_provider = provider;
                 config.chatgpt_base_url = server_uri;
                 config.features.enable(Feature::AsyncCompaction).unwrap();
@@ -69,6 +75,9 @@ async fn cancelled_turn_skips_launch_but_preserves_existing_work(trigger: Compac
     .await
     .expect("record usage");
     let status = super::super::context_window::context_window_token_status(&sess, &turn).await;
+    assert!(!status.token_limit_reached);
+    let context_window = step.settings.model_info.resolved_context_window().unwrap();
+    assert!(i128::from(status.active_context_tokens) * 100 >= i128::from(context_window) * 65);
     let world_state = Arc::new(WorldState::default());
     let cancelled = CancellationToken::new();
     cancelled.cancel();
@@ -104,6 +113,16 @@ async fn cancelled_turn_skips_launch_but_preserves_existing_work(trigger: Compac
         (Some("routing".to_string()), auth),
     )
     .await;
+    if local_compaction {
+        wait_for_background_compaction_for_test(&sess).await;
+        assert_eq!(
+            request.requests().len(),
+            0,
+            "local override forbids speculative provider requests"
+        );
+        shutdown(&sess).await;
+        return;
+    }
     turn_cancellation.cancel();
     maybe_start(
         &sess,
