@@ -30,6 +30,6 @@ version is **0.7.0**, with provenance label `cfl/v0.164.0-native.0.7.0`
 Owned runtime delta: explicit local compaction routing and Owner prompt,
 current-turn-only retention, neutral continuity prefix and checkpoint reuse.
 The override uses 0.164.0 local compaction step/world-state handling and
-disables speculative remote compaction. Upstream lockfile and all unrelated
-source remain exactly stable 0.164.0; prior lockfile version normalization is
-obsolete because this stable release already records workspace 0.164.0.
+disables speculative remote compaction. All unrelated source remains exactly stable 0.164.0. Its Cargo.lock still
+records local packages as 0.0.0; normalize only those 166 workspace versions
+to 0.164.0 so `--locked` builds succeed, preserving dependency/checksum pins.
