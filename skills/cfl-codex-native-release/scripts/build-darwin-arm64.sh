@@ -27,7 +27,8 @@ test -x "$helper"
 mkdir -p .scratch
 release_dir=$(mktemp -d "$PWD/.scratch/cfl-darwin.XXXXXX")
 
-/usr/sbin/taskpolicy -m 6144 -P kill \
+"$python_bin" scripts/cfl_build_guard.py -- \
+  /usr/sbin/taskpolicy -m 6144 -P kill \
   "$python_bin" scripts/cfl_release.py \
   --target aarch64-apple-darwin \
   --release-tag "$release_tag" \

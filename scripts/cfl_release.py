@@ -231,9 +231,19 @@ def linux_scoped(
         f"--property={name}={value}" for name, value in LINUX_SCOPE_PROPERTIES.items()
     ]
     scoped_environment = [
-        f"--setenv={name}={environment[name]}"
+        f"--setenv={name}"
         for name in (
             "PATH",
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
+            "NO_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "all_proxy",
+            "no_proxy",
+            "SSL_CERT_FILE",
+            "CARGO_NET_GIT_FETCH_WITH_CLI",
             "CARGO_HOME",
             "CARGO_TARGET_DIR",
             "CARGO_BUILD_JOBS",
